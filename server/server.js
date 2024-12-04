@@ -131,13 +131,11 @@ app.delete('/api/products/:id', async (req, res) => {  // Add :id to the endpoin
 
 
 
-
-
 app.get("/api/customizeoffer", async (req, res) => {
 
     try {
         const db = dbClient.db(dbName);
-        const collection = db.collection('CustomerOffers');
+        const collection = db.collection('CustomizeOffer');
         const documents = await collection.find({}).toArray();
         console.log(documents);
 
@@ -153,9 +151,40 @@ app.get("/api/customizeoffer", async (req, res) => {
 app.post('/api/customizeoffer', async (req, res) => {
     try {
         const db = dbClient.db(dbName);
-        const collection = db.collection('CustomerOffers');
+        const collection = db.collection('CustomizeOffer');
         const result = await collection.insertOne(req.body);
         res.status(200).json(result);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.post('/api/customizeoffer/:code/orders', async (req, res) => {
+    const oferCode = parseInt(req.params.code);
+    const newMember = req.body; // The new member data is sent in the request body
+
+    try {
+        const db = dbClient.db(dbName);
+        const collection = db.collection('CustomizeOffer');
+        
+        const result = await collection.updateOne(
+            { ofr_Code: oferCode }, // Find the team by tea_Id
+            { $set: { 
+                
+                // tea_TotalCoins:newMember.map(val=>parseInt(val.mem_TotalCoins)).reduce((a,b)=>a+b,0),
+                // tea_TotalOrder:newMember.map(val=>parseInt(val.mem_TotalOrder)).reduce((a,b)=>a+b,0),
+                // tea_TotalEarnings:newMember.map(val=>parseInt(val.mem_TotalEarnings)).reduce((a,b)=>a+b,0),
+                // tea_PendingAmount:newMember.map(val=>parseInt(val.mem_PendingAmount)).reduce((a,b)=>a+b,0),
+                orders: newMember
+             } } // Add the new member to the members array
+        );
+
+        if (result.modifiedCount > 0) {
+            res.status(200).json({ message: `New member added to Team ${oferCode}`,data:await collection.find({}).toArray() });
+        } else {
+            res.status(404).json({ message: `Team with ID ${oferCode} not found`,data:{}});
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -264,6 +293,92 @@ app.delete("/api/leader",async (req,res)=>{
     }
       
 })
+
+app.post('/api/teams/:id/member', async (req, res) => {
+    const teamId = parseInt(req.params.id);
+    const newMember = req.body; // The new member data is sent in the request body
+
+    try {
+        const db = dbClient.db(dbName);
+        const collection = db.collection('Teams');
+
+        // Update the team document by adding a new member to the 'members' array
+        console.log(newMember.map(val=>parseInt(val.mem_TotalOrder)).reduce((a,b)=>a+b,0));
+        
+        const result = await collection.updateOne(
+            { tea_Id: teamId }, // Find the team by tea_Id
+            { $set: { 
+                
+                tea_TotalCoins:newMember.map(val=>parseInt(val.mem_TotalCoins)).reduce((a,b)=>a+b,0),
+                tea_TotalOrder:newMember.map(val=>parseInt(val.mem_TotalOrder)).reduce((a,b)=>a+b,0),
+                tea_TotalEarnings:newMember.map(val=>parseInt(val.mem_TotalEarnings)).reduce((a,b)=>a+b,0),
+                tea_PendingAmount:newMember.map(val=>parseInt(val.mem_PendingAmount)).reduce((a,b)=>a+b,0),
+                members: newMember
+             } } // Add the new member to the members array
+        );
+
+        if (result.modifiedCount > 0) {
+            res.status(200).json({ message: `New member added to Team ${teamId}`,data:await collection.find({}).toArray() });
+        } else {
+            res.status(404).json({ message: `Team with ID ${teamId} not found`,data:{}});
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/api/teams/:id/member/:memId', async (req, res) => {
+    const teamId = parseInt(req.params.id);
+    const memberId = parseInt(req.params.memId);
+    const updatedMember = req.body; // The updated member data is sent in the request body
+
+    try {
+        const db = dbClient.db(dbName);
+        const collection = db.collection('Teams');
+
+        // Update the member's details in the 'members' array
+        const result = await collection.updateOne(
+            { tea_Id: teamId, "members.mem_Id": memberId }, // Find the team by tea_Id and the member by mem_Id
+            { $set: { "members.$": updatedMember } } // Update the member in the array
+        );
+
+        if (result.modifiedCount > 0) {
+            res.status(200).json({ message: `Member with ID ${memberId} updated successfully` });
+        } else {
+            res.status(404).json({ message: `Member with ID ${memberId} not found in Team ${teamId}` });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.delete('/api/teams/:id/member/:memId', async (req, res) => {
+    const teamId = parseInt(req.params.id);
+    const memberId = parseInt(req.params.memId);
+
+    try {
+        const db = dbClient.db(dbName);
+        const collection = db.collection('Teams');
+
+        // Remove the member from the 'members' array
+        const result = await collection.updateOne(
+            { tea_Id: teamId }, // Find the team by tea_Id
+            { $pull: { members: { mem_Id: memberId } } } // Remove the member with the given mem_Id
+        );
+
+        if (result.modifiedCount > 0) {
+            res.status(200).json({ message: `Member with ID ${memberId} removed from Team ${teamId}` });
+        } else {
+            res.status(404).json({ message: `Member with ID ${memberId} not found in Team ${teamId}` });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 
 const port = process.env.PORT || 7000;
 app.listen(port, () => {
